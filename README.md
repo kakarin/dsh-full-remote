@@ -562,3 +562,97 @@ from the local control surface.
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [SECURITY.md](./SECURITY.md)
 - [MIT](./LICENSE) © 2026 [JUANWANG-BUAA](https://github.com/JUANWANG-BUAA)
+
+## Staying in sync with upstream (fork maintenance)
+
+This repository is a fork of [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote). It adds exactly one capability: an **owner-supplied access token** (see `accessToken` under Configuration, and Settings → Reverse proxy → Custom token). Everything else tracks upstream. When upstream ships a release, replay that one change set onto the new base.
+
+> Note: `scripts/sync-upstream.sh` lives in the git repository only; the npm package does not ship `scripts/` (it is not in the `files` allowlist). This section covers source maintenance, not post-install usage.
+
+### One-time setup
+
+```sh
+git remote add upstream https://github.com/JUANWANG-BUAA/dsh-full-remote.git
+```
+
+`origin` is this fork, `upstream` is the original repository. Fetch from upstream only; never push to it.
+
+### Sync (recommended: the script)
+
+```sh
+bash scripts/sync-upstream.sh
+
+# When direct GitHub access is blocked, point the script at a proxy. The proxy
+# is injected into individual git commands only; no global config is written.
+DSH_GIT_PROXY=http://HOST:PORT bash scripts/sync-upstream.sh
+```
+
+The script fetches upstream, checks whether this fork is behind, runs `git rebase upstream/main`, prints per-file resolution hints and stops on conflict, then on success runs `pnpm install` + `pnpm run check:ci` + `pnpm pack` and pushes with `git push --force-with-lease`.
+
+### Sync (manual)
+
+```sh
+git fetch upstream main
+git rebase upstream/main
+# On conflict: fix files per the table below, then
+git add <file> && git rebase --continue
+pnpm install && pnpm run check:ci && pnpm pack
+git push --force-with-lease origin HEAD:main
+```
+
+`--force-with-lease` is required because rebase rewrites history. It is safer than `--force`: if anyone else pushed, it refuses instead of overwriting.
+
+### Sync (many conflicts: replay as patches)
+
+When upstream rewrites a lot of documentation at once, rebase conflicts in sequence. Patch replay is atomic and can be abandoned cleanly:
+
+```sh
+# One-time: export this fork's changes relative to upstream
+git format-patch 0c24350..HEAD -o /tmp/local-changes
+
+# After an upstream update: return to clean upstream, then replay
+git fetch upstream main
+git reset --hard upstream/main
+git am /tmp/local-changes/*.patch
+pnpm run check:ci
+```
+
+If `git am` stops, `git am --abort` returns to a clean tree — no half-finished rebase left behind. The baseline `0c24350` is v0.5.0; record the new baseline here after each successful sync and swap it into the export command.
+
+### Conflict resolution
+
+Changes are confined to a handful of files, so conflicts are predictable:
+
+| File | Why it conflicts | Resolution |
+|---|---|---|
+| `CHANGELOG.md` | Upstream writes it on every release | Keep upstream's new entries, re-paste the `0.5.1-custom-token.1` section on top |
+| `README.md` / `README.zh.md` | Same | Keep upstream's content, re-add the `accessToken` config line and its paragraph |
+| `package.json` | Version | Upstream version + `-custom-token.N` suffix, e.g. `0.6.0-custom-token.1` |
+| `src/index.ts` | Load-time token decision + `setToken()` + control wiring | Keep upstream's structure, re-insert the `configuredToken` branch and `setToken` |
+| `src/config.ts` | `accessToken` field | Add one line after `allowTokenRead` |
+| `src/persist.ts` | Token read-back validation | Keep the `validateAccessToken` version (upstream's `length >= 24` floor is the bug this fork fixes) |
+| `src/control-routes.ts` | `POST /set-token` route | Add after `/rotate-token` |
+| `src/security.ts` | `validateAccessToken` and length constants | Entirely new; usually no conflict |
+| `src/client/RemoteSection.tsx`, `src/client/i18n.ts`, `src/client/types.ts`, `src/client/index.ts` | Custom-token form and copy | Keep upstream's layout, re-insert the form block and `token.custom.*` strings |
+| `tests/control.test.ts` | Short-token semantics | Keep the `'short'` case (invalid → regenerate) and the `Owner-Tok-1` case (valid → keep sessions) |
+| `tests/set-token.test.ts` | Added by this fork | Does not exist upstream; usually no conflict |
+| `src/proxy.ts` | **Untouched by this fork** | On conflict take upstream's version |
+
+`src/proxy.ts` — the 48 KB authentication core — is unmodified, so the real logic conflict surface is small. Conflicts concentrate in release-time documentation and version numbers.
+
+### Installing after a sync
+
+```sh
+pnpm pack
+dsh plugin --profile web add ./dsh-full-remote-<version>.tgz
+```
+
+Remove the old package first: the plugin id inserted by `cordis.patch.yml` is fixed as `reverse-proxy`, so two packages inserting the same id collide in the composition.
+
+### The fork's complete diff
+
+```sh
+git diff --stat upstream/main...HEAD
+```
+
+One capability: the access token can be chosen by the owner instead of always being the generated 192-bit string.

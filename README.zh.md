@@ -378,3 +378,96 @@ pnpm run check:ci
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [SECURITY.md](./SECURITY.md)
 - [MIT](./LICENSE) © 2026 [JUANWANG-BUAA](https://github.com/JUANWANG-BUAA)
+
+## 与上游同步（本 fork 维护说明）
+
+本仓库是 [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote) 的分支，相对上游只加了一处能力：**自定义访问令牌**（见「常用配置」里的 `accessToken`，以及设置页 → 反向代理 → 自定义令牌）。其余行为跟随上游。上游发新版本后，按下述流程把这一处改动重放到新上游之上。
+
+> 说明：`scripts/sync-upstream.sh` 只存在于 git 仓库，不随 npm 包发布（`files` 白名单不含 `scripts/`）。本节面向源码维护，不是安装后的用户操作。
+
+### 一次性准备
+
+```sh
+git remote add upstream https://github.com/JUANWANG-BUAA/dsh-full-remote.git
+```
+
+`origin` 指向本 fork，`upstream` 指向原作者仓库。只从上游 fetch，不往上游推。
+
+### 同步（推荐：脚本）
+
+```sh
+bash scripts/sync-upstream.sh
+
+# 直连 GitHub 不通时指定代理，只注入单条 git 命令，不写任何全局配置
+DSH_GIT_PROXY=http://HOST:PORT bash scripts/sync-upstream.sh
+```
+
+脚本依次执行：fetch 上游 → 判断是否落后 → `git rebase upstream/main` → 冲突时打印逐文件解法并停下 → 通过后 `pnpm install` + `pnpm run check:ci` + `pnpm pack` → `git push --force-with-lease` 回本 fork。
+
+### 同步（手动）
+
+```sh
+git fetch upstream main
+git rebase upstream/main
+# 有冲突：按下面「冲突处理」改文件，然后
+git add <file> && git rebase --continue
+pnpm install && pnpm run check:ci && pnpm pack
+git push --force-with-lease origin HEAD:main
+```
+
+`--force-with-lease` 是必需的：rebase 会重写历史。它比 `--force` 安全，远端被别处推过时会拒绝而不是覆盖。
+
+### 同步（冲突多时：patch 重放）
+
+上游一次性改了大量文档时，rebase 会连续冲突。patch 重放是原子的，失败可直接放弃：
+
+```sh
+# 一次性：把本 fork 相对上游的改动导出成 patch
+git format-patch 0c24350..HEAD -o /tmp/local-changes
+
+# 上游更新后：回到干净上游，再重放
+git fetch upstream main
+git reset --hard upstream/main
+git am /tmp/local-changes/*.patch
+pnpm run check:ci
+```
+
+`git am` 中途失败用 `git am --abort` 回到干净状态，不会留下半个 rebase 现场。基线 SHA `0c24350` 是 v0.5.0；每次同步成功后把新基线记在这里，下次导 patch 时替换。
+
+### 冲突处理
+
+改动集中在少数文件，冲突基本可预测：
+
+| 文件 | 冲突原因 | 解法 |
+|---|---|---|
+| `CHANGELOG.md` | 上游每次发版都写 | 保留上游新条目，把 `0.5.1-custom-token.1` 那节重新贴到最上面 |
+| `README.md` / `README.zh.md` | 同上 | 保留上游内容，补回 `accessToken` 配置行与说明段落 |
+| `package.json` | 版本号 | 上游版本号 + `-custom-token.N` 后缀，例如 `0.6.0-custom-token.1` |
+| `src/index.ts` | 加载时的令牌判定 + `setToken()` + 控制面接线 | 保留上游结构，重插 `configuredToken` 判定与 `setToken` |
+| `src/config.ts` | `accessToken` 字段 | 在 `allowTokenRead` 之后补一行 |
+| `src/persist.ts` | 令牌读回校验 | 保留 `validateAccessToken` 版本（上游 `length >= 24` 的门槛是本 fork 修掉的 bug） |
+| `src/control-routes.ts` | `POST /set-token` 路由 | 在 `/rotate-token` 之后补 |
+| `src/security.ts` | `validateAccessToken` 与长度常量 | 整段新增，一般无冲突 |
+| `src/client/RemoteSection.tsx`、`src/client/i18n.ts`、`src/client/types.ts`、`src/client/index.ts` | 自定义令牌输入框与文案 | 保留上游布局，重插表单块与 `token.custom.*` 文案 |
+| `tests/control.test.ts` | 短令牌语义 | 保留 `'short'` 用例（非法，触发重新生成）与 `Owner-Tok-1` 用例（合法，保留会话） |
+| `tests/set-token.test.ts` | 本 fork 新增 | 上游不存在此文件，一般无冲突 |
+| `src/proxy.ts` | **本 fork 未改动** | 冲突了直接取上游版本 |
+
+`src/proxy.ts`（48 KB 的鉴权主干）一行未改，所以真正的核心逻辑冲突面很小；冲突主要集中在发版必改的文档与版本号上。
+
+### 同步后安装
+
+```sh
+pnpm pack
+dsh plugin --profile web add ./dsh-full-remote-<版本>.tgz
+```
+
+装新包前先卸掉旧包：`cordis.patch.yml` 插入的插件 id 固定为 `reverse-proxy`，两个包同时存在会对同一 id 重复 insert 而组合冲突。
+
+### 本 fork 的完整差异
+
+```sh
+git diff --stat upstream/main...HEAD
+```
+
+只有一处能力：访问令牌可以由使用者自己指定，而不是固定使用生成的 192 位随机串。
