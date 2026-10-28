@@ -26,6 +26,7 @@ function api(overrides: Partial<ProxyApi> = {}): ProxyApi {
     stop: vi.fn().mockResolvedValue(stopped),
     token: vi.fn().mockResolvedValue('secret-token'),
     rotateToken: vi.fn().mockResolvedValue({ ...stopped, accessToken: 'next-token' }),
+    setToken: vi.fn().mockResolvedValue({ ok: true, accessToken: 'custom-token', unchanged: false }),
     setListen: vi.fn().mockResolvedValue(stopped),
     sessions: vi.fn().mockResolvedValue([]),
     approveSession: vi.fn().mockResolvedValue({ ok: true }),

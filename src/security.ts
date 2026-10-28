@@ -24,6 +24,34 @@ export function safeEqual(actual: string, expected: string) {
   return timingSafeEqual(left, right)
 }
 
+/** Shortest custom token accepted: long enough that a LAN guest cannot guess it in a lunch break. */
+export const MIN_ACCESS_TOKEN_LENGTH = 8
+/** Longest custom token accepted: keeps the login form and the state file sane. */
+export const MAX_ACCESS_TOKEN_LENGTH = 128
+
+/**
+ * Why a user-supplied token was rejected. `undefined` means it is acceptable.
+ *
+ * The rules are deliberately shape-agnostic — letters, digits and punctuation
+ * are all welcome, so an owner can pick a passphrase they can retype on a phone
+ * keyboard. What is enforced is length plus printable-ASCII-only: whitespace
+ * and non-ASCII would be silently mangled by cookie/header handling before the
+ * constant-time comparison ever runs, which turns a "wrong" token into a
+ * mysterious 401 instead of an up-front validation error.
+ */
+export type AccessTokenProblem = 'empty' | 'too-short' | 'too-long' | 'invalid-chars'
+
+export function validateAccessToken(value: unknown): AccessTokenProblem | undefined {
+  if (typeof value !== 'string') return 'empty'
+  const token = value
+  if (token.length === 0) return 'empty'
+  if (token.length < MIN_ACCESS_TOKEN_LENGTH) return 'too-short'
+  if (token.length > MAX_ACCESS_TOKEN_LENGTH) return 'too-long'
+  // 0x21-0x7e: printable ASCII, no space, no control characters.
+  if (!/^[\x21-\x7E]+$/.test(token)) return 'invalid-chars'
+  return undefined
+}
+
 export function parseCookies(header: string | undefined): Record<string, string> {
   const cookies: Record<string, string> = {}
   for (const field of String(header ?? '').split(';')) {

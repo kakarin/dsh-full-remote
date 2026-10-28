@@ -3,6 +3,34 @@
 All notable changes to dsh-full-remote (formerly dsh-reverse-proxy) are
 documented in this file.
 
+## 0.5.1-custom-token.1
+
+Fork-local release (`kakarin/dsh-full-remote`): the access token no longer has
+to be the generated 192-bit string.
+
+### Added
+
+- **`accessToken` config field.** Pin your own token instead of the generated
+  one. Accepts 8-128 printable ASCII characters with no spaces; empty keeps the
+  generated token. A configured value overrides the stored token at load, and
+  revokes every device session when it differs from the stored one — a new
+  credential must not leave previously authorised browsers signed in.
+- **`POST /dsh-reverse-proxy/set-token`** (`{ "token": "..." }`) and a **Custom
+  token** field in *Settings → Reverse proxy*. Applies without a Harness
+  restart: the listener is torn down and rebound in place, the tunnel is
+  restarted if it was live, and the same session revocation applies. Invalid
+  values answer `400` with a stable code (`empty` | `too-short` | `too-long` |
+  `invalid-chars`) that the panel localises; resubmitting the live token answers
+  `200` with `unchanged: true`.
+- `token.set` / `token.set-failed` audit events.
+
+### Fixed
+
+- The state reader discarded any stored token shorter than 24 characters, so an
+  owner-chosen token was written successfully and then silently replaced by a
+  generated one on the next start (losing the stored device sessions with it).
+  Read-back now accepts exactly what the validator accepts.
+
 ## 0.5.0 (2026-10-22)
 
 ### Transport performance

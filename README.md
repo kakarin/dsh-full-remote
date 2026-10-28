@@ -423,6 +423,7 @@ Common options:
     sessionIdleSeconds: 0        # 0: off; otherwise idle timeout in seconds
     auditLog: true
     allowTokenRead: false        # safer default; enable only for local token re-read
+    accessToken: ""              # pin your own token (8-128 printable ASCII); empty = generated
     cloudflaredPath: ""          # optional path to cloudflared for the one-click tunnel
     tlsCertFile: ""              # optional local HTTPS
     tlsKeyFile: ""
@@ -516,6 +517,11 @@ from the internet:
   WebSocket output, SSE and plugin login/wait/home pages are not compressed
   by this HTTP path. Full contract: [HTTP transport](./docs/http-gzip.md);
   measured gains and costs: [benchmark](./docs/performance-benchmark.md).
+- `accessToken` is optional. When set, the proxy uses your token instead of the
+  generated one; changing it revokes every device session, exactly like a
+  rotation. The same effect is available without a restart from
+  *Settings → Reverse proxy → Custom token*, which is the recommended path
+  because it also rebinds a running listener in place.
 
 ## Development
 

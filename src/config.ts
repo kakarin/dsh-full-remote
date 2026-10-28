@@ -46,6 +46,7 @@ export const Config = Schema.object({
   auditLogFile: Schema.string().default('').description('Audit JSONL path; empty uses <stateFile without .json>.audit.jsonl.'),
   allowedCidrs: Schema.array(Schema.string()).default([]).description('Optional remote IP allowlist (CIDR or bare IP). Empty = allow all authenticated clients. Loopback is always allowed.'),
   allowTokenRead: Schema.boolean().default(false).description('When true, GET /token reveals the standing access token over loopback. Keep false unless local tooling requires token re-read; rotate-token always returns the replacement token.'),
+  accessToken: Schema.string().default('').description('Pin your own access token instead of the generated 192-bit one. Empty keeps the generated token. 8-128 printable ASCII characters, no spaces. A configured value overrides the stored token at load and revokes existing device sessions when it differs; change it from Settings → Reverse proxy to avoid a restart.'),
   tlsCertFile: Schema.string().default('').description('Optional PEM certificate path for local TLS on the proxy listen port (pair with tlsKeyFile). Empty = plain HTTP.'),
   tlsKeyFile: Schema.string().default('').description('Optional PEM private key path for local TLS (pair with tlsCertFile).'),
   trustForwardedProto: Schema.boolean().default(false).description('When true, trust inbound X-Forwarded-Proto from a reverse-edge for Secure cookies and upstream proto. Leave false unless a trusted TLS terminator sits in front.'),

@@ -56,7 +56,9 @@ export function RemoteSection({ api, t, language }: RemoteSectionProps) {
   useLanguage(language)
   const [status, setStatus] = useState<ProxyStatus>()
   const [accessToken, setAccessToken] = useState<string>()
-  const [busyKind, setBusyKind] = useState<'start' | 'stop' | 'listen' | 'token' | 'check' | 'invite' | 'device' | 'tunnel' | undefined>()
+  /** Draft value of the custom-token field; cleared once the host accepts it. */
+  const [customToken, setCustomToken] = useState('')
+  const [busyKind, setBusyKind] = useState<'start' | 'stop' | 'listen' | 'token' | 'setToken' | 'check' | 'invite' | 'device' | 'tunnel' | undefined>()
   const busy = busyKind !== undefined
   const [toast, setToast] = useState<(PanelToastModel & { id: number })>()
   const [listenHost, setListenHost] = useState('')
@@ -174,7 +176,7 @@ export function RemoteSection({ api, t, language }: RemoteSectionProps) {
   }
 
   const withBusy = async (
-    kind: 'start' | 'stop' | 'listen' | 'token' | 'check' | 'invite' | 'device' | 'tunnel',
+    kind: 'start' | 'stop' | 'listen' | 'token' | 'setToken' | 'check' | 'invite' | 'device' | 'tunnel',
     work: () => Promise<void>,
   ) => {
     setBusyKind(kind)
@@ -286,6 +288,48 @@ export function RemoteSection({ api, t, language }: RemoteSectionProps) {
         setAccessToken(next.accessToken)
       }
       applyResult(next, 'rotate')
+      void refreshSessions(sessionsEpoch.current)
+    })
+  }
+
+  /** Map a rejected /set-token code onto localised copy without leaking the raw code. */
+  const tokenErrorText = (reason: unknown) => {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    if (message === 'empty') return t('token.custom.error.empty')
+    if (message === 'too-short') return t('token.custom.error.too-short')
+    if (message === 'too-long') return t('token.custom.error.too-long')
+    if (message === 'invalid-chars') return t('token.custom.error.invalid-chars')
+    return t('token.custom.error.generic')
+  }
+
+  const saveCustomToken = async () => {
+    const value = customToken.trim()
+    if (value === '') {
+      showToast({ kind: 'error', text: t('token.custom.error.empty') })
+      return
+    }
+    await withBusy('setToken', async () => {
+      let result
+      try {
+        result = await api.setToken(value)
+      } catch (reason) {
+        showToast({ kind: 'error', text: tokenErrorText(reason) })
+        return
+      }
+      // Any successful token change revokes every device session host-side, so
+      // the list is stale by definition: repaint from the same epoch that
+      // invalidates an in-flight poll.
+      sessionsEpoch.current += 1
+      if (mounted.current) {
+        setInvite(undefined)
+        setSessions([])
+        setAccessToken(result.accessToken)
+        setCustomToken('')
+      }
+      showToast({
+        kind: result.unchanged ? 'warn' : 'success',
+        text: t(result.unchanged ? 'token.custom.unchanged' : 'token.custom.saved'),
+      })
       void refreshSessions(sessionsEpoch.current)
     })
   }
@@ -786,6 +830,31 @@ export function RemoteSection({ api, t, language }: RemoteSectionProps) {
               </button>
             </div>
           )}
+          <label className={css.field}>
+            <span>{t('token.custom.label')}</span>
+            <input
+              className={css.input}
+              type="text"
+              value={customToken}
+              onChange={event => { setCustomToken(event.target.value) }}
+              placeholder={t('token.custom.placeholder')}
+              autoComplete="new-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={128}
+            />
+          </label>
+          <div className={css.tokenActions}>
+            <button
+              className={css.secondaryButton}
+              type="button"
+              disabled={busy || customToken.trim() === ''}
+              onClick={() => { void saveCustomToken() }}
+            >{busyKind === 'setToken' ? t('busy') : t('token.custom.save')}</button>
+          </div>
+          <p className={css.hint}>{t('token.custom.description')}</p>
+          <p className={css.hint}>{t('token.custom.hint')}</p>
         </div>
       </section>
 

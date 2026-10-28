@@ -23,7 +23,7 @@ import { InteractionOverlay } from './InteractionOverlay.tsx'
 import { createPendingSource } from './pending-source.ts'
 import { createCockpitConnection, type ConnectionSourceHandle } from './cockpit-connection.ts'
 import { bindTranslate } from './i18n.ts'
-import type { AuditResult, InviteResult, ProxyApi, ProxyStatus, SelfCheckResult, SessionInfo } from './types.ts'
+import type { AuditResult, InviteResult, ProxyApi, ProxyStatus, SelfCheckResult, SessionInfo, SetTokenResult } from './types.ts'
 import { CONTROL_HEADER, CONTROL_HEADER_VALUE, CONTROL_PREFIX } from '../control.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -102,6 +102,9 @@ function createApi(): ProxyApi {
     stop: () => post('/stop'),
     token: async () => (await request<{ accessToken: string }>('/token')).accessToken,
     rotateToken: () => post<ProxyStatus & { accessToken: string }>('/rotate-token'),
+    // A rejected value arrives as HTTP 400 with `{ error: code }`, so
+    // request() throws an Error whose message IS the code; the panel maps it.
+    setToken: token => post<SetTokenResult>('/set-token', { token }),
     setListen: (host, port) => post('/listen', { host, port }),
     sessions: async () => (await request<{ sessions: SessionInfo[] }>('/sessions')).sessions ?? [],
     approveSession: id => post<{ ok: boolean }>('/sessions/approve', { id }),

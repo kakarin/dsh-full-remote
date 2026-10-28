@@ -5,6 +5,7 @@
  * without being mistaken for a first install and overwritten.
  */
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { validateAccessToken } from './security.ts'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -53,10 +54,14 @@ function normalizeState(parsed: unknown): PersistedState {
   } | null
   const listenHost = value?.listenHost
   const listenPort = value?.listenPort
+  // Accept exactly what validateAccessToken accepts. The old `length >= 24`
+  // floor silently dropped a perfectly good owner-chosen token on read-back,
+  // so a custom token survived the write and vanished on the next restart.
+  const accessToken = value?.accessToken
   return {
     enabled: value?.enabled === true,
-    ...(typeof value?.accessToken === 'string' && value.accessToken.length >= 24
-      ? { accessToken: value.accessToken }
+    ...(typeof accessToken === 'string' && validateAccessToken(accessToken) === undefined
+      ? { accessToken }
       : {}),
     ...(typeof listenHost === 'string'
       && listenHost.length > 0

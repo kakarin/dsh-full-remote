@@ -81,12 +81,23 @@ export type AuditResult = {
   events: AuditEvent[]
 }
 
+/**
+ * A successful save of an owner-supplied access token.
+ *
+ * A rejected value comes back as HTTP 400, which `request()` turns into a
+ * thrown Error whose `message` is the rejection code — so this type only ever
+ * describes the accepted case and callers do not need to narrow it.
+ */
+export type SetTokenResult = { ok: true, accessToken: string, unchanged: boolean }
+
 export type ProxyApi = {
   status: () => Promise<ProxyStatus>
   start: () => Promise<ProxyStatus>
   stop: () => Promise<ProxyStatus>
   token: () => Promise<string>
   rotateToken: () => Promise<ProxyStatus & { accessToken: string }>
+  /** Persist `token` as the access token. Throws with the rejection code as `message` when invalid. */
+  setToken: (token: string) => Promise<SetTokenResult>
   setListen: (host: string, port: number) => Promise<ProxyStatus>
   sessions: () => Promise<SessionInfo[]>
   approveSession: (id: string) => Promise<{ ok: boolean }>

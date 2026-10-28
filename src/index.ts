@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path'
 import { Config, type RuntimeConfig } from './config.ts'
 import { bootstrapUpstreamCookie, listenProxy, type BackendBrowserAuth, type ProxyServer } from './proxy.ts'
 import { defaultStateFile, readStateDetailed, writeState, type PersistedState } from './persist.ts'
-import { generateAccessToken } from './security.ts'
+import { generateAccessToken, validateAccessToken } from './security.ts'
 import { createSessionStore } from './sessions.ts'
 import { createTunnelManager, tunnelTrustsForwarding } from './tunnel.ts'
 import {
@@ -38,7 +38,7 @@ import { LOGIN_PATH } from './pages.ts'
 import { CONTROL_PREFIX } from './control.ts'
 import { validateBackendHost, validateRuntimeConfig } from './config-validation.ts'
 import { injectIndexEnhancements } from './index-enhancements.ts'
-import { createControlRoutes, type InviteResult } from './control-routes.ts'
+import { createControlRoutes, type InviteResult, type SetTokenResult } from './control-routes.ts'
 import type { RuntimeStatus } from './runtime-types.ts'
 import {
   DIRECTORY_PICKER_NATIVE_OPT_OUT,
@@ -173,10 +173,18 @@ export function createRuntime(ctx: RuntimeContext, config: RuntimeConfig, deps: 
       if (statePersistenceBlocked) {
         ctx.logger.warn(`reverse-proxy: state file ${statePath} is ${result.status}; keeping a temporary in-memory state and refusing automatic overwrite`)
       }
-      // A missing/short token is regenerated. Old device cookies must not
-      // survive that — same semantics as an explicit rotate.
-      const regeneratedToken = loaded.accessToken === undefined
-      if (regeneratedToken) {
+      // A configured (custom) token wins over whatever the state file holds, so
+      // an owner can pin their own credential. Whichever route produces the
+      // effective token, a *change* must invalidate the stored device cookies:
+      // sessions are independent of the token, so hydrating them onto a new
+      // credential would silently keep old browsers authenticated.
+      const configuredToken = typeof config.accessToken === 'string' ? config.accessToken.trim() : ''
+      const credentialChanged = configuredToken !== ''
+        ? configuredToken !== loaded.accessToken
+        : loaded.accessToken === undefined
+      if (configuredToken !== '') {
+        loaded.accessToken = configuredToken
+      } else if (loaded.accessToken === undefined) {
         loaded.accessToken = generateAccessToken()
       }
       state = loaded
@@ -187,7 +195,7 @@ export function createRuntime(ctx: RuntimeContext, config: RuntimeConfig, deps: 
         approvalRequired: config.approvalMode,
         onChange: scheduleSave,
       })
-      if (!regeneratedToken) sessionStore.hydrate(loaded.sessions)
+      if (!credentialChanged) sessionStore.hydrate(loaded.sessions)
       if (!statePersistenceBlocked) await save()
       return loaded
     })()
@@ -428,6 +436,47 @@ export function createRuntime(ctx: RuntimeContext, config: RuntimeConfig, deps: 
   }
 
   /**
+   * Replace the standing token with one the owner chose.
+   *
+   * `rotateToken` mints 192 fresh bits nobody can memorise; this path accepts a
+   * passphrase instead, so a phone user can retype it without a QR round-trip.
+   * The session store is cleared for the same reason a rotation clears it —
+   * sessions are independent of the token, so leaving them alive would keep
+   * every previously authorised browser in after the credential changed.
+   * A listener that was already up is restarted so the running proxy picks up
+   * the new value without a harness restart.
+   */
+  const setToken = (token: unknown): Promise<SetTokenResult> => exclusive(async (): Promise<SetTokenResult> => {
+    await load()
+    const problem = validateAccessToken(token)
+    if (problem !== undefined) return { ok: false, error: problem }
+    const value = token as string
+    if (value === state!.accessToken) return { ok: true, accessToken: value, unchanged: true }
+    const restart = bound !== undefined
+    const wasTunnel = tunnelLive()
+    const previousToken = state!.accessToken
+    const previousSessions = sessionStore!.serialize()
+    await teardown()
+    state!.accessToken = value
+    sessionStore!.clear()
+    inviteStore.clear()
+    try {
+      await save({ required: true })
+    } catch (error) {
+      state!.accessToken = previousToken
+      sessionStore!.hydrate(previousSessions)
+      lastFailure = 'set-token-save-failed'
+      void audit.record('token.set-failed')
+      throw error
+    }
+    void audit.record('token.set', { custom: true })
+    ctx.logger.info('reverse-proxy: access token replaced by a custom value')
+    if (restart) await start()
+    await restartTunnelIfLive(wasTunnel)
+    return { ok: true, accessToken: value, unchanged: false }
+  })
+
+  /**
    * Change the published listen address at runtime. A running proxy is
    * restarted on the new address; when the new bind fails, the previous
    * address is restored so the user never loses an already working entry.
@@ -538,6 +587,7 @@ export function createRuntime(ctx: RuntimeContext, config: RuntimeConfig, deps: 
       void audit.record('token.reveal')
       return state!.accessToken
     }),
+    setToken,
     listSessions: async () => {
       await load()
       return sessionStore!.list()
@@ -609,6 +659,7 @@ export function createRuntime(ctx: RuntimeContext, config: RuntimeConfig, deps: 
       return state!.accessToken
     }),
     rotateToken: () => exclusive(rotateToken),
+    setToken: (token: unknown) => setToken(token),
     setListen,
     selfCheck: () => shared(() => runSelfCheck()),
     handle: control.handle,

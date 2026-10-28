@@ -300,6 +300,7 @@ dsh plugin --profile web add ./dsh-full-remote-0.5.0.tgz
     sessionIdleSeconds: 0        # 0 = 关闭；否则按空闲秒数过期
     auditLog: true
     allowTokenRead: false        # 更安全的默认值；仅本机工具需要重读时开启
+    accessToken: ""              # 自己指定令牌（8-128 位可见 ASCII）；留空则自动生成
     cloudflaredPath: ""          # 可选：一键隧道用的 cloudflared 路径
     tlsCertFile: ""              # 可选本地 HTTPS
     tlsKeyFile: ""
@@ -343,6 +344,7 @@ Host/Origin 改写恢复了特权接口，同时也使 Harness 对远程客户�
 - 插件以自身的访问控制层替代 Harness 的远程信任校验，该层若存在缺陷，影响严重。若 Harness 未来提供官方远程访问能力，应重新评估本插件的定位。
 - 一键快速隧道：URL 每次启动随机变化（旧邀请与登录失效）、官方定位是临时/测试用途，非 HTML 大流量内容受 Cloudflare 条款限制；首次使用需按需下载 cloudflared（18–52 MB，取决于平台），Windows ARM64 没有官方构建（可自行安装后填 `cloudflaredPath`）。日常稳定入口仍建议自备 frp / ngrok / 命名隧道。
 - 代理侧 Brotli/gzip 可帮助局域网与 SSH/frp；Cloudflare 快速隧道边缘可能已压缩，不能假设仍有相同字节收益，但命中的代理静态缓存仍可减少上游工作。对话 WebSocket 流、SSE 与插件自己的登录/等待/主页不走该 HTTP 压缩路径。完整约定：[HTTP 传输](./docs/http-gzip.zh.md)；实测收益与代价：[性能报告](./docs/performance-benchmark.zh.md)。
+- `accessToken` 是可选字段。填了就用自己的令牌替换自动生成的那个；改动它会撤销所有设备会话，语义与轮换令牌一致。不想重启 Harness 时，从**设置 → 反向代理 → 自定义令牌**改，效果相同，而且会把已在运行的监听原地重启。
 
 ## 开发
 

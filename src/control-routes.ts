@@ -13,6 +13,18 @@ export type InviteResult =
   | { error: 'invalid-base' | 'not-running' }
   | { inviteUrl: string, qrSvg?: string }
 
+/** Why a custom access token was rejected; the UI maps each code to copy. */
+export type SetTokenError = 'empty' | 'too-short' | 'too-long' | 'invalid-chars'
+
+/**
+ * Result of replacing the access token with an owner-supplied value.
+ * `unchanged` is true when the submitted value already was the live token, so
+ * the caller can distinguish "saved" from "nothing to do" without diffing.
+ */
+export type SetTokenResult =
+  | { ok: true, accessToken: string, unchanged: boolean }
+  | { ok: false, error: SetTokenError }
+
 export interface ControlRouteDeps {
   allowTokenRead: boolean
   audit: {
@@ -27,6 +39,8 @@ export interface ControlRouteDeps {
   runSelfCheck(): Promise<unknown>
   buildInvite(publicBase?: string): Promise<InviteResult>
   readToken(): Promise<string>
+  /** Validate and persist an owner-supplied access token; revokes every device session on success. */
+  setToken(token: unknown): Promise<SetTokenResult>
   listSessions(): Promise<unknown[]>
   mutateSession(action: 'approve' | 'revoke' | 'rename', id: string, label?: string): Promise<boolean>
   startTunnel(): Promise<'ok' | 'not-running' | 'tls-unsupported' | 'disposed'>
@@ -154,6 +168,15 @@ export function createControlRoutes(deps: ControlRouteDeps) {
   route('POST', '/start', runAction(deps.start))
   route('POST', '/stop', runAction(deps.stop))
   route('POST', '/rotate-token', runAction(deps.rotateToken))
+  route('POST', '/set-token', withJson(async (body, res) => {
+    const result = await deps.setToken(body.token)
+    if (!result.ok) {
+      // 400 + a stable code: the panel localises it, a curl user reads it raw.
+      sendJson(res, 400, { error: result.error })
+      return
+    }
+    sendJson(res, 200, result)
+  }))
   route('POST', '/listen', withJson(async (body, res) => {
     sendJson(res, 200, await deps.setListen(body.host, body.port))
   }))

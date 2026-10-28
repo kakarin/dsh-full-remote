@@ -428,14 +428,17 @@ describe('runtime control surface', () => {
     assert.equal(sessions.some(session => session.id === 'device1'), true)
   })
 
-  it('does not hydrate sessions when a short access token forces regeneration', async () => {
+  it('does not hydrate sessions when an unusable access token forces regeneration', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-reverse-proxy-regen-'))
     cleanups.push(() => rm(dir, { recursive: true, force: true }))
     const stateFile = join(dir, 'state.json')
     const now = Date.now()
     await writeState(stateFile, {
       enabled: false,
-      accessToken: 'too-short',
+      // Below MIN_ACCESS_TOKEN_LENGTH (8), so the stored credential is unusable
+      // and must be replaced rather than honoured. A merely *short-looking*
+      // token is different now: 8+ characters is a legitimate custom token.
+      accessToken: 'short',
       sessions: [{
         id: 'device1',
         secretHash: 'hash',
@@ -451,6 +454,34 @@ describe('runtime control surface', () => {
     assert.match(token, /^[A-Za-z0-9_-]{32}$/)
     const listed = await call(runtime, { path: '/dsh-reverse-proxy/sessions', method: 'GET', headers: CONTROL })
     assert.deepEqual(listed.body, { sessions: [] })
+  })
+
+  it('keeps a valid custom token and hydrates its sessions', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-reverse-proxy-custom-token-'))
+    cleanups.push(() => rm(dir, { recursive: true, force: true }))
+    const stateFile = join(dir, 'state.json')
+    const now = Date.now()
+    await writeState(stateFile, {
+      enabled: false,
+      // 11 characters: below the old 24-character read floor, above the new
+      // custom-token minimum. It must survive a reload instead of being
+      // silently replaced by a generated token.
+      accessToken: 'Owner-Tok-1',
+      sessions: [{
+        id: 'keeper',
+        secretHash: 'hash',
+        label: 'Phone',
+        status: 'active',
+        createdAt: now,
+        lastSeenAt: now,
+      }],
+    })
+    const runtime = createRuntime(makeContext(), makeConfig(stateFile))
+    cleanups.push(() => runtime.dispose())
+    assert.equal(await runtime.token(), 'Owner-Tok-1')
+    const listed = await call(runtime, { path: '/dsh-reverse-proxy/sessions', method: 'GET', headers: CONTROL })
+    const sessions = (listed.body as { sessions: Array<{ id: string }> }).sessions
+    assert.equal(sessions.some(session => session.id === 'keeper'), true)
   })
 
   it('does not overwrite a malformed state file or start from it', async () => {
