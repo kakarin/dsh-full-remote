@@ -97,7 +97,8 @@ BASELINE=$(git merge-base HEAD upstream/main)
 # Drop stale patch files first: a rebase can merge commits, which renames or
 # removes outputs, and `format-patch` never prunes what it no longer writes.
 rm -f patches/*.patch
-if git format-patch "$BASELINE..HEAD" -o patches --quiet; then
+# Exclude patches/ itself: a patch cannot contain the snapshot it belongs to.
+if git format-patch "$BASELINE..HEAD" -o patches --quiet -- . ':(exclude)patches'; then
   echo "    基线 $BASELINE，$(ls -1 patches/*.patch | wc -l) 个 patch"
 else
   echo "!! patches/ 刷新失败（不影响本次推送，可稍后手动执行）" >&2

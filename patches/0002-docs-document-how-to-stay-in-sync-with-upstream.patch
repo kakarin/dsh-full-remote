@@ -1,7 +1,7 @@
 From 49cfb357eef8d90c62bf075f9601d76dfae8a787 Mon Sep 17 00:00:00 2001
 From: kakarin <27130590+kakarin@users.noreply.github.com>
 Date: Thu, 29 Oct 2026 01:34:13 +0800
-Subject: [PATCH 2/3] docs: document how to stay in sync with upstream
+Subject: [PATCH 2/4] docs: document how to stay in sync with upstream
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

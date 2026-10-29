@@ -1,7 +1,7 @@
 From 9bcf55ac28006535f3e21b72e7665ed685754b9a Mon Sep 17 00:00:00 2001
 From: kakarin <kakarin@users.noreply.github.com>
 Date: Thu, 29 Oct 2026 21:12:28 +0800
-Subject: [PATCH 3/3] feat(cockpit): let each browser turn the task console off
+Subject: [PATCH 3/4] feat(cockpit): let each browser turn the task console off
 
 The phone-first Task cockpit appears automatically on remote hosts and in
 viewports 720px wide or less. Owners running a desktop browser at a narrow
