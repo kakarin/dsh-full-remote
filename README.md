@@ -225,6 +225,13 @@ flowchart LR
 - A minimizable **Task cockpit** appears on phone-width viewports (≤720 CSS px)
   or remote hostnames. Phones get a full-width bottom panel; wider remote windows
   get a compact right-side panel. Colors follow the Harness light/dark theme.
+- Turn the cockpit off for one browser in **Settings → Reverse proxy → Task
+  console**, or with the **Hide** button in the cockpit header. The choice is a
+  client preference (`localStorage` key `dsh-full-remote.cockpit`), applied
+  instantly without a Harness restart; the settings switch stays available while
+  hidden, so it can always be brought back. Hiding it also removes the phone's
+  only per-frame confirmation entry — approvals then wait in the conversation
+  composer.
 - **Needs you** lists the highest-priority interaction per session: tool approval,
   questions, or plan review. Choose any pending item, return to the inbox, or
   minimize without cancelling. Drafts survive switching/minimizing within the

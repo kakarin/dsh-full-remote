@@ -22,6 +22,7 @@ import {
   type RemotePendingItem,
   type RemotePendingState,
 } from './pending-source.ts'
+import { NO_COCKPIT_CONTROLLER, useCockpitPreference, type CockpitPreferenceController } from './cockpit-preference.ts'
 import css from './interaction.module.css'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -37,6 +38,8 @@ export type InteractionOverlayInjected = {
   /** Test seam; omit in production so the overlay follows hostname/viewport. */
   enabled?: boolean
   connection?: CockpitConnection
+  /** Per-browser "don't show the cockpit" switch; omitted in tests and previews. */
+  cockpit?: CockpitPreferenceController
   canOpenSession?: boolean
   openSession: (sessionId: string) => void
   answerApproval: (key: string, outcome: 'allowed-once' | 'rejected') => Promise<void>
@@ -80,6 +83,7 @@ export function InteractionOverlay({
   openSession,
   canOpenSession,
   connection,
+  cockpit,
   answerApproval,
   answerQuestion,
   cancelQuestion,
@@ -99,12 +103,15 @@ export function InteractionOverlay({
   }, [enabled])
 
   const state = useRemotePending(snapshot => snapshot)
-  if (!(enabled ?? autoEnabled)) return null
+  // Read the preference unconditionally (hooks order), then honour it below.
+  const cockpitPreference = useCockpitPreference(cockpit ?? NO_COCKPIT_CONTROLLER)
+  if (!(enabled ?? autoEnabled) || cockpitPreference === 'off') return null
   const guard = async (operation: () => Promise<void>) => {
     if (connection?.getSnapshot().state !== 'connected') throw new Error(t('cockpit.offlineHint'))
     await operation()
   }
   return <RemoteCockpit state={state} connection={connection} t={t}
+    onHide={cockpit === undefined ? undefined : () => { cockpit.setPreference('off') }}
     canOpenSession={canOpenSession} openSession={openSession}
     renderItem={item => <InteractBody item={item} t={t} openSession={openSession} canOpenSession={canOpenSession}
       answerApproval={(key, outcome) => guard(() => answerApproval(key, outcome))}

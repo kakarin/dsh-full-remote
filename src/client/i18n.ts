@@ -194,6 +194,7 @@ export const zh = {
   'cockpit.launch': '任务控制台，{count} 项待办',
   'cockpit.subtitle': '跨会话查看进度，选择需要你处理的操作。',
   'cockpit.close': '收起控制台',
+  'cockpit.hide': '不再显示',
   'cockpit.back': '返回待办列表',
   'cockpit.pending': '待我处理',
   'cockpit.sessions': '会话',
@@ -247,6 +248,13 @@ export const zh = {
   'interact.question.unanswered': '请先选择或输入答案。',
   'interact.plan.approve': '批准计划',
   'interact.plan.decline': '拒绝计划',
+  'console.label': '任务控制台',
+  'console.description': '远程或窄屏访问时的悬浮入口，用来确认审批和提问。',
+  'console.state.auto': '当前：自动显示（远程访问，或窗口宽度不超过 720px 时出现）',
+  'console.state.off': '当前：已在本浏览器隐藏',
+  'console.show': '恢复显示',
+  'console.hideHere': '不再显示',
+  'console.hint': '这是浏览器本地偏好，只影响当前设备；不改变反向代理的监听与令牌。',
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
@@ -426,6 +434,7 @@ export const en: Record<keyof typeof zh, string> = {
   'cockpit.launch': 'Task cockpit, {count} pending',
   'cockpit.subtitle': 'Follow progress across sessions and choose what needs you.',
   'cockpit.close': 'Minimize cockpit',
+  'cockpit.hide': 'Hide',
   'cockpit.back': 'Back to inbox',
   'cockpit.pending': 'Needs you',
   'cockpit.sessions': 'Sessions',
@@ -479,6 +488,13 @@ export const en: Record<keyof typeof zh, string> = {
   'interact.question.unanswered': 'Choose or type an answer first.',
   'interact.plan.approve': 'Approve plan',
   'interact.plan.decline': 'Decline plan',
+  'console.label': 'Task console',
+  'console.description': 'Floating entry for remote or narrow-screen visits, used to answer approvals and questions.',
+  'console.state.auto': 'Current: automatic (shown on remote hosts, or when the window is 720px wide or less)',
+  'console.state.off': 'Current: hidden in this browser',
+  'console.show': 'Show again',
+  'console.hideHere': 'Hide here',
+  'console.hint': 'A local browser preference: it affects this device only and changes neither the listener nor the access token.',
 }
 
 export type ReverseProxyTranslate = (key: keyof typeof zh, params?: Record<string, unknown>) => string

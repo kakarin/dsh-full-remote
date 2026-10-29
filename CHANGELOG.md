@@ -3,6 +3,37 @@
 All notable changes to dsh-full-remote (formerly dsh-reverse-proxy) are
 documented in this file.
 
+## 0.5.1-custom-token.2
+
+Fork-local release (`kakarin/dsh-full-remote`): the phone-first Task cockpit can
+now be turned off per browser.
+
+### Added
+
+- **Task console switch** in *Settings → Reverse proxy*. The cockpit is a
+  floating launcher that appears automatically on remote hosts and in viewports
+  720px wide or less, because that is where Harness's own approval sheets are
+  easy to miss. Owners who run a desktop browser at a narrow width had no way to
+  suppress it: no config field, no settings control.
+- The switch is a **client preference** (`localStorage`
+  `dsh-full-remote.cockpit`, value `off`), not a host config field — it
+  describes one browser's viewport habits, not the proxy's behaviour. It applies
+  immediately without a Harness restart, survives reloads, and syncs across tabs
+  through `storage` events.
+- The cockpit header gained a **不再显示 / Hide** button that flips the same
+  preference and minimises the panel, so the switch is reachable from where the
+  annoyance is.
+
+### Notes
+
+- Turning it off removes the only per-frame confirmation entry on a phone: the
+  official approval and question sheets live in the conversation composer,
+  which is exactly what the cockpit exists to work around. The settings switch
+  stays visible while hidden so the cockpit can always be brought back.
+- `shouldUseInteractionOverlay()` keeps its original hostname/viewport rule; the
+  preference is applied at the overlay boundary, so the automatic behaviour and
+  its tests are untouched.
+
 ## 0.5.1-custom-token.1
 
 Fork-local release (`kakarin/dsh-full-remote`): the access token no longer has

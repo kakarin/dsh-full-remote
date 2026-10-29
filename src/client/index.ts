@@ -21,6 +21,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteSection } from './RemoteSection.tsx'
 import { InteractionOverlay } from './InteractionOverlay.tsx'
 import { createPendingSource } from './pending-source.ts'
+import { createCockpitPreference } from './cockpit-preference.ts'
 import { createCockpitConnection, type ConnectionSourceHandle } from './cockpit-connection.ts'
 import { bindTranslate } from './i18n.ts'
 import type { AuditResult, InviteResult, ProxyApi, ProxyStatus, SelfCheckResult, SessionInfo, SetTokenResult } from './types.ts'
@@ -134,12 +135,16 @@ export function apply(ctx: Context): void {
   const api = createApi()
   const { t, language, dispose } = bindTranslate(ctx)
   if (dispose !== undefined) ctx.effect(() => dispose)
+  // One controller per page: the settings switch and the overlay must agree
+  // immediately, and `storage` events alone would never notify the same tab.
+  const cockpit = createCockpitPreference()
+  ctx.effect(() => () => cockpit.dispose(), 'reverse-proxy: cockpit preference')
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'reverse-proxy',
     order: 30,
     label: () => t('action.label'),
-    inject: () => ({ api, t, language }),
+    inject: () => ({ api, t, language, cockpit }),
   }, RemoteSection))
   ctx.inject(['sessions', 'uiSession', 'connection', 'uiWorkspace'], (scope: Context) => {
     const sessions = scope.get('sessions') as ISessions | undefined
@@ -162,6 +167,7 @@ export function apply(ctx: Context): void {
       inject: () => ({
         t,
         language,
+        cockpit,
         connection,
         canOpenSession: workspace !== undefined,
         openSession: (id: string) => { workspace?.openSession(id as SessionId) },

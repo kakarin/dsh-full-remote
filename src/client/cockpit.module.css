@@ -11,6 +11,7 @@
 .panel { position: absolute; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-height: calc(100% - max(12px, env(safe-area-inset-top))); height: min(88dvh, 820px); padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); border: 1px solid var(--dsw-alias-border-l2); border-radius: 20px 20px 0 0; background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-base)); pointer-events: auto; overflow: hidden; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; }
 .header h2 { margin: 0; font: inherit; font-size: 20px; font-weight: 650; line-height: 1.4; }
+.headerActions { flex: none; display: flex; align-items: center; gap: 4px; }
 .eyebrow { margin: 0 0 2px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
 .icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 22px; cursor: pointer; }
 .connection { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: 8px; margin-top: 8px; flex: none; }

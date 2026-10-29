@@ -11,6 +11,7 @@ import { DevicesSection } from './DevicesSection.tsx'
 import { createVisibilityPolling } from './visibility-polling.ts'
 import type { ReverseProxyTranslate } from './i18n.ts'
 import { useLanguage, type LanguageController } from './language.ts'
+import { NO_COCKPIT_CONTROLLER, useCockpitPreference, type CockpitPreferenceController } from './cockpit-preference.ts'
 import { PanelToast } from './PanelToast.tsx'
 import { ReverseProxyIcon } from './ReverseProxyIcon.tsx'
 import { SectionIcon } from './SectionIcon.tsx'
@@ -20,7 +21,7 @@ import css from './remote.module.css'
 
 export type RemoteSectionProps =
   & PropsRuntime<'settings.section'>
-  & { api: ProxyApi, t: ReverseProxyTranslate, language?: LanguageController }
+  & { api: ProxyApi, t: ReverseProxyTranslate, language?: LanguageController, cockpit?: CockpitPreferenceController }
 
 /** Only render QR SVG that looks like our own generator output. */
 function safeQrSvg(svg: string | undefined) {
@@ -52,8 +53,9 @@ function CopyField(props: {
   )
 }
 
-export function RemoteSection({ api, t, language }: RemoteSectionProps) {
+export function RemoteSection({ api, t, language, cockpit }: RemoteSectionProps) {
   useLanguage(language)
+  const cockpitPreference = useCockpitPreference(cockpit ?? NO_COCKPIT_CONTROLLER)
   const [status, setStatus] = useState<ProxyStatus>()
   const [accessToken, setAccessToken] = useState<string>()
   /** Draft value of the custom-token field; cleared once the host accepts it. */
@@ -939,6 +941,33 @@ export function RemoteSection({ api, t, language }: RemoteSectionProps) {
           )}
         </div>
       </section>
+      {cockpit !== undefined && (
+        <section className={css.card} data-shot="console">
+          <header className={css.cardHead}>
+            <span className={css.cardIcon}><SectionIcon name="console" /></span>
+            <div className={css.cardHeading}>
+              <h3 className={css.cardTitle}>{t('console.label')}</h3>
+              <p className={css.cardDesc}>{t('console.description')}</p>
+            </div>
+          </header>
+          <div className={css.cardBody}>
+            <p className={css.hint}>
+              {cockpitPreference === 'off' ? t('console.state.off') : t('console.state.auto')}
+            </p>
+            <div className={css.tokenActions}>
+              <button
+                className={css.secondaryButton}
+                type="button"
+                data-action="toggle-console"
+                onClick={() => { cockpit.setPreference(cockpitPreference === 'off' ? 'auto' : 'off') }}
+              >
+                {cockpitPreference === 'off' ? t('console.show') : t('console.hideHere')}
+              </button>
+            </div>
+            <p className={css.hint}>{t('console.hint')}</p>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

@@ -26,6 +26,8 @@ type Props = {
   canOpenSession?: boolean
   openSession: (id: string) => void
   renderItem: (item: RemotePendingItem) => ReactNode
+  /** Persist "this browser does not want the cockpit", then minimize. */
+  onHide?: () => void
 }
 
 function kindLabel(item: RemotePendingItem, t: ReverseProxyTranslate) {
@@ -40,7 +42,7 @@ function sessionLabel(session: RemoteSessionView, t: ReverseProxyTranslate) {
   return t(session.running === false ? 'cockpit.stopped' : 'cockpit.unknown')
 }
 
-export function RemoteCockpit({ state, connection, t, canOpenSession = true, openSession, renderItem }: Props) {
+export function RemoteCockpit({ state, connection, t, canOpenSession = true, openSession, renderItem, onHide }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<'pending' | 'sessions'>('pending')
   const [selected, setSelected] = useState<string>()
@@ -169,7 +171,12 @@ export function RemoteCockpit({ state, connection, t, canOpenSession = true, ope
       }}>
       <header className={css.header}>
         <div><p className={css.eyebrow}>DeepSeek Harness</p><h2 id={id + '-title'}>{t('cockpit.title')}</h2></div>
-        <button ref={closeRef} type="button" className={css.icon} aria-label={t('cockpit.close')} onClick={minimize}>×</button>
+        <div className={css.headerActions}>
+          {onHide !== undefined && <button type="button" className={css.textButton} onClick={() => { onHide(); minimize() }}>
+            {t('cockpit.hide')}
+          </button>}
+          <button ref={closeRef} type="button" className={css.icon} aria-label={t('cockpit.close')} onClick={minimize}>×</button>
+        </div>
       </header>
       <div className={css.connection}>
         <span className={css.channel}><span className={css.indicator} data-state={channel.state} aria-hidden="true" />{channelLabel}</span>

@@ -17,6 +17,7 @@ export type SectionIconName =
   | 'devices'
   | 'check'
   | 'audit'
+  | 'console'
 
 const GLYPHS: Record<SectionIconName, string> = {
   // Globe: ring plus one meridian, the endpoint other devices dial.
@@ -33,6 +34,8 @@ const GLYPHS: Record<SectionIconName, string> = {
   check: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 1.5a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm2.6 3L7.2 9.4 5.6 7.8l-1.1 1.1 2.7 2.7 4.5-4.5-1.1-1.1Z',
   // Three stacked bars: the audit log rows.
   audit: 'M2 3.2h12v1.6H2zM2 7.2h12v1.6H2zM2 11.2h8.4v1.6H2z',
+  // Framed panel with a count chip: the floating task console.
+  console: 'M1.6 2.8h12.8v10.4H1.6V2.8Zm1.5 1.5v7.4h9.8V4.3H3.1Zm1.4 1.1h4.6v2.9H4.5V5.4Z',
 }
 
 export function SectionIcon({ name, size = 13 }: { name: SectionIconName, size?: number }) {
