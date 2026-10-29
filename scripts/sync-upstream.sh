@@ -2,10 +2,12 @@
 #
 # Rebase this fork onto the latest upstream JUANWANG-BUAA/dsh-full-remote.
 #
-# The fork adds one capability on top of upstream: an owner-supplied access
-# token (see `accessToken` in README → Configuration). Everything else tracks
-# upstream, so the job after an upstream release is: replay that one change set
-# onto the new base, prove it still builds, then publish the tarball.
+# The fork adds two capabilities on top of upstream: an owner-supplied access
+# token (`accessToken` in README → Configuration) and a per-browser switch that
+# hides the Task cockpit. Everything else tracks upstream, so the job after an
+# upstream release is: replay those two change sets onto the new base, prove it
+# still builds, then publish the tarball. `patches/` holds a replayable snapshot
+# of the same changes and is refreshed by this script after a successful sync.
 #
 # Usage:
 #   bash scripts/sync-upstream.sh
@@ -55,14 +57,19 @@ if ! git rebase upstream/main; then
 
 !! rebase 停在冲突处。按文件处理（详见 README「与上游同步」的冲突表）：
 
-   CHANGELOG.md                保留上游新条目，把本 fork 那节重新贴到最上面
-   README.md / README.zh.md    保留上游内容，补回 accessToken 配置行与说明
+   CHANGELOG.md                保留上游新条目，把本 fork 那几节重新贴到最上面
+   README.md / README.zh.md    保留上游内容，补回 accessToken 配置行与「任务控制台」开关说明
    package.json                上游版本号 + -custom-token.N 后缀
-   src/index.ts                保留上游结构，重插 configuredToken 判定与 setToken()
+   src/index.ts                configuredToken 判定、setToken()；并新建 cockpit 偏好控制器注入两处 slot
    src/config.ts               allowTokenRead 之后补 accessToken 字段
    src/persist.ts              保留 validateAccessToken 版本（上游 bug 已在此修掉）
    src/control-routes.ts       /rotate-token 之后补 /set-token 路由
-   src/client/*                重插自定义令牌表单与 token.custom.* 文案
+   src/client/RemoteSection.tsx  token.custom.* 表单 + 「任务控制台」卡片
+   src/client/i18n.ts          token.custom.* 与 console.* / cockpit.hide 文案（zh 与 en 两处）
+   src/client/InteractionOverlay.tsx  保留上游渲染，重插 useCockpitPreference 与 off 短路
+   src/client/RemoteCockpit.tsx + cockpit.module.css  标题栏「不再显示」按钮与 .headerActions
+   src/client/SectionIcon.tsx  console 图标补进上游联合类型
+   src/client/cockpit-preference.ts / tests/cockpit-preference.client.test.tsx  本 fork 新增文件
    tests/control.test.ts       保留 'short'（非法）与 'Owner-Tok-1'（合法）两个用例
    src/proxy.ts                本 fork 未改动，冲突了直接取上游版本（git checkout --theirs）
 
@@ -83,6 +90,22 @@ echo "==> 完整检查（lint + 类型 + 单测 + 客户端测试 + 构建）"
 if ! pnpm run check:ci; then
   echo "!! 检查未通过，先修再推（当前提交尚未上传，可直接 git commit --amend）" >&2
   exit 1
+fi
+
+echo "==> 刷新 patches/ 快照（供下次上游更新直接 git am）"
+BASELINE=$(git merge-base HEAD upstream/main)
+# Drop stale patch files first: a rebase can merge commits, which renames or
+# removes outputs, and `format-patch` never prunes what it no longer writes.
+rm -f patches/*.patch
+if git format-patch "$BASELINE..HEAD" -o patches --quiet; then
+  echo "    基线 $BASELINE，$(ls -1 patches/*.patch | wc -l) 个 patch"
+else
+  echo "!! patches/ 刷新失败（不影响本次推送，可稍后手动执行）" >&2
+fi
+if ! git diff --quiet -- patches; then
+  git add patches
+  git commit -q -m "chore: refresh patches/ snapshot for $(git rev-parse --short HEAD)"
+  echo "    已提交 patches/ 更新"
 fi
 
 echo "==> 打包"

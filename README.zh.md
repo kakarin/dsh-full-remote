@@ -382,7 +382,14 @@ pnpm run check:ci
 
 ## 与上游同步（本 fork 维护说明）
 
-本仓库是 [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote) 的分支，相对上游只加了一处能力：**自定义访问令牌**（见「常用配置」里的 `accessToken`，以及设置页 → 反向代理 → 自定义令牌）。其余行为跟随上游。上游发新版本后，按下述流程把这一处改动重放到新上游之上。
+本仓库是 [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote) 的分支，相对上游只有两处改动，其余行为跟随上游：
+
+| 改动 | 出现位置 |
+|---|---|
+| **自定义访问令牌** | 「常用配置」里的 `accessToken`；设置页 → 反向代理 → 自定义令牌 |
+| **每浏览器可关掉任务控制台** | 设置页 → 反向代理 → 任务控制台；控制台标题栏的「不再显示」按钮 |
+
+上游发新版本后，按下述流程把这两处改动重放到新上游之上。`patches/` 目录里存着同样内容的可重放 patch（每次同步后重新生成），上游大改时可以直接 `git am`，不必逐个文件解冲突。
 
 > 说明：`scripts/sync-upstream.sh` 只存在于 git 仓库，不随 npm 包发布（`files` 白名单不含 `scripts/`）。本节面向源码维护，不是安装后的用户操作。
 
@@ -435,6 +442,13 @@ pnpm run check:ci
 
 `git am` 中途失败用 `git am --abort` 回到干净状态，不会留下半个 rebase 现场。基线 SHA `0c24350` 是 v0.5.0；每次同步成功后把新基线记在这里，下次导 patch 时替换。
 
+仓库里的 `patches/` 存了一份提交过的 patch（每个改动集一个文件，由 `git format-patch <基线>..HEAD` 导出）。它是快照而不是第二份事实来源：**每次同步成功后都要重新生成**，否则会和 HEAD 脱节。
+
+```sh
+# 同步成功后刷新仓库里的 patch 快照
+git format-patch 0c24350..HEAD -o patches
+```
+
 ### 冲突处理
 
 改动集中在少数文件，冲突基本可预测：
@@ -443,13 +457,18 @@ pnpm run check:ci
 |---|---|---|
 | `CHANGELOG.md` | 上游每次发版都写 | 保留上游新条目，把 `0.5.1-custom-token.1` 那节重新贴到最上面 |
 | `README.md` / `README.zh.md` | 同上 | 保留上游内容，补回 `accessToken` 配置行与说明段落 |
-| `package.json` | 版本号 | 上游版本号 + `-custom-token.N` 后缀，例如 `0.6.0-custom-token.1` |
+| `package.json` | 版本号 | 上游版本号 + `-custom-token.N` 后缀，例如 `0.6.0-custom-token.2` |
 | `src/index.ts` | 加载时的令牌判定 + `setToken()` + 控制面接线 | 保留上游结构，重插 `configuredToken` 判定与 `setToken` |
 | `src/config.ts` | `accessToken` 字段 | 在 `allowTokenRead` 之后补一行 |
 | `src/persist.ts` | 令牌读回校验 | 保留 `validateAccessToken` 版本（上游 `length >= 24` 的门槛是本 fork 修掉的 bug） |
 | `src/control-routes.ts` | `POST /set-token` 路由 | 在 `/rotate-token` 之后补 |
 | `src/security.ts` | `validateAccessToken` 与长度常量 | 整段新增，一般无冲突 |
 | `src/client/RemoteSection.tsx`、`src/client/i18n.ts`、`src/client/types.ts`、`src/client/index.ts` | 自定义令牌输入框与文案 | 保留上游布局，重插表单块与 `token.custom.*` 文案 |
+| `src/client/InteractionOverlay.tsx` | 控制台的显示边界 | 保留上游的 props 与渲染，重插 `useCockpitPreference` 读取与 `\|\| cockpitPreference === 'off'` 短路 |
+| `src/client/RemoteCockpit.tsx` + `src/client/cockpit.module.css` | 标题栏「不再显示」按钮与 `.headerActions` | 保留上游 header，重插按钮块 |
+| `src/client/SectionIcon.tsx` | `console` 图标 | 把该 glyph 条目补进上游的联合类型 |
+| `src/client/cockpit-preference.ts` | 本 fork 新增 | 上游不存在此文件，一般无冲突 |
+| `tests/cockpit-preference.client.test.tsx` | 本 fork 新增 | 上游不存在此文件，一般无冲突 |
 | `tests/control.test.ts` | 短令牌语义 | 保留 `'short'` 用例（非法，触发重新生成）与 `Owner-Tok-1` 用例（合法，保留会话） |
 | `tests/set-token.test.ts` | 本 fork 新增 | 上游不存在此文件，一般无冲突 |
 | `src/proxy.ts` | **本 fork 未改动** | 冲突了直接取上游版本 |
@@ -471,4 +490,4 @@ dsh plugin --profile web add ./dsh-full-remote-<版本>.tgz
 git diff --stat upstream/main...HEAD
 ```
 
-只有一处能力：访问令牌可以由使用者自己指定，而不是固定使用生成的 192 位随机串。
+两处改动：访问令牌可以由使用者自己指定（而不是固定使用生成的 192 位随机串），以及每个浏览器可以自行关掉任务控制台。

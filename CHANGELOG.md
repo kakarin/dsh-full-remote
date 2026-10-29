@@ -34,6 +34,17 @@ now be turned off per browser.
   preference is applied at the overlay boundary, so the automatic behaviour and
   its tests are untouched.
 
+### Docs
+
+- The fork-maintenance section of both READMEs now describes **two** changes
+  instead of one, with the Task console in the conflict table
+  (`InteractionOverlay.tsx`, `RemoteCockpit.tsx` + `cockpit.module.css`,
+  `SectionIcon.tsx`, plus the two files this fork adds).
+- `patches/` holds a committed, replayable snapshot of the fork's commits
+  (`git format-patch 0c24350..HEAD`), with its own README. It is regenerated and
+  committed by `scripts/sync-upstream.sh` after every successful sync; its
+  conflict hints now cover the console files too.
+
 ## 0.5.1-custom-token.1
 
 Fork-local release (`kakarin/dsh-full-remote`): the access token no longer has

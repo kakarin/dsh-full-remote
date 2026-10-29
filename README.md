@@ -572,7 +572,14 @@ from the local control surface.
 
 ## Staying in sync with upstream (fork maintenance)
 
-This repository is a fork of [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote). It adds exactly one capability: an **owner-supplied access token** (see `accessToken` under Configuration, and Settings → Reverse proxy → Custom token). Everything else tracks upstream. When upstream ships a release, replay that one change set onto the new base.
+This repository is a fork of [`JUANWANG-BUAA/dsh-full-remote`](https://github.com/JUANWANG-BUAA/dsh-full-remote). It carries exactly two changes on top of upstream; everything else tracks upstream:
+
+| Change | Where it shows up |
+|---|---|
+| **Owner-supplied access token** | `accessToken` under Configuration; Settings → Reverse proxy → Custom token |
+| **Per-browser Task console switch** | Settings → Reverse proxy → Task console; the cockpit header's **Hide** button |
+
+When upstream ships a release, replay those two change sets onto the new base. `patches/` holds the same changes as replayable patch files — regenerate them after every sync — so a heavily rewritten upstream can be handled with `git am` instead of a conflict-by-conflict rebase.
 
 > Note: `scripts/sync-upstream.sh` lives in the git repository only; the npm package does not ship `scripts/` (it is not in the `files` allowlist). This section covers source maintenance, not post-install usage.
 
@@ -626,6 +633,13 @@ pnpm run check:ci
 
 If `git am` stops, `git am --abort` returns to a clean tree — no half-finished rebase left behind. The baseline `0c24350` is v0.5.0; record the new baseline here after each successful sync and swap it into the export command.
 
+A committed copy of these patches lives in `patches/` (one file per change set, exported with `git format-patch <baseline>..HEAD`). They are a convenience snapshot, not a second source of truth: regenerate them after every sync so they keep matching HEAD.
+
+```sh
+# after a successful sync, refresh the committed snapshot
+git format-patch 0c24350..HEAD -o patches
+```
+
 ### Conflict resolution
 
 Changes are confined to a handful of files, so conflicts are predictable:
@@ -634,13 +648,18 @@ Changes are confined to a handful of files, so conflicts are predictable:
 |---|---|---|
 | `CHANGELOG.md` | Upstream writes it on every release | Keep upstream's new entries, re-paste the `0.5.1-custom-token.1` section on top |
 | `README.md` / `README.zh.md` | Same | Keep upstream's content, re-add the `accessToken` config line and its paragraph |
-| `package.json` | Version | Upstream version + `-custom-token.N` suffix, e.g. `0.6.0-custom-token.1` |
+| `package.json` | Version | Upstream version + `-custom-token.N` suffix, e.g. `0.6.0-custom-token.2` |
 | `src/index.ts` | Load-time token decision + `setToken()` + control wiring | Keep upstream's structure, re-insert the `configuredToken` branch and `setToken` |
 | `src/config.ts` | `accessToken` field | Add one line after `allowTokenRead` |
 | `src/persist.ts` | Token read-back validation | Keep the `validateAccessToken` version (upstream's `length >= 24` floor is the bug this fork fixes) |
 | `src/control-routes.ts` | `POST /set-token` route | Add after `/rotate-token` |
 | `src/security.ts` | `validateAccessToken` and length constants | Entirely new; usually no conflict |
 | `src/client/RemoteSection.tsx`, `src/client/i18n.ts`, `src/client/types.ts`, `src/client/index.ts` | Custom-token form and copy | Keep upstream's layout, re-insert the form block and `token.custom.*` strings |
+| `src/client/InteractionOverlay.tsx` | Cockpit visibility boundary | Keep upstream's props and rendering, re-insert the `useCockpitPreference` read and the `\|\| cockpitPreference === 'off'` guard |
+| `src/client/RemoteCockpit.tsx` + `src/client/cockpit.module.css` | Header **Hide** button and its `.headerActions` row | Keep upstream's header, re-insert the button block |
+| `src/client/SectionIcon.tsx` | `console` glyph | Copy the glyph entry into upstream's union |
+| `src/client/cockpit-preference.ts` | Added by this fork | Does not exist upstream; usually no conflict |
+| `tests/cockpit-preference.client.test.tsx` | Added by this fork | Does not exist upstream; usually no conflict |
 | `tests/control.test.ts` | Short-token semantics | Keep the `'short'` case (invalid → regenerate) and the `Owner-Tok-1` case (valid → keep sessions) |
 | `tests/set-token.test.ts` | Added by this fork | Does not exist upstream; usually no conflict |
 | `src/proxy.ts` | **Untouched by this fork** | On conflict take upstream's version |
@@ -662,4 +681,4 @@ Remove the old package first: the plugin id inserted by `cordis.patch.yml` is fi
 git diff --stat upstream/main...HEAD
 ```
 
-One capability: the access token can be chosen by the owner instead of always being the generated 192-bit string.
+Two changes: the access token can be chosen by the owner instead of always being the generated 192-bit string, and each browser can turn the Task cockpit off.
